@@ -1,0 +1,2 @@
+# lojaclip
+loja clip
