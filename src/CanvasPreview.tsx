@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FrameFormat, VideoClip } from './types'
+import { drawImageWithMotion } from './motion'
 
 interface Props {
   clip: VideoClip | null
@@ -123,7 +124,8 @@ export function CanvasPreview({ clip, localTime, playing, format, title, subtitl
       ctx.fillRect(0, 0, w, h)
 
       if (clip?.kind === 'image' && imageRef.current) {
-        drawCover(ctx, imageRef.current, imageRef.current.naturalWidth, imageRef.current.naturalHeight, w, h)
+        const duration = Math.max(0.25, clip.outPoint - clip.inPoint)
+        drawImageWithMotion(ctx, imageRef.current, imageRef.current.naturalWidth, imageRef.current.naturalHeight, w, h, clip.motion, localTime / duration)
       } else if (clip?.kind === 'video') {
         const video = videoRef.current
         if (video && video.readyState >= 2 && video.videoWidth) drawCover(ctx, video, video.videoWidth, video.videoHeight, w, h)
@@ -144,16 +146,16 @@ export function CanvasPreview({ clip, localTime, playing, format, title, subtitl
       if (title || subtitle) {
         const overlay = ctx.createLinearGradient(0, h * .62, 0, h)
         overlay.addColorStop(0, 'rgba(19, 17, 15, 0)')
-        overlay.addColorStop(1, 'rgba(19, 17, 15, .70)')
+        overlay.addColorStop(1, 'rgba(18, 16, 14, .72)')
         ctx.fillStyle = overlay
         ctx.fillRect(0, h * .58, w, h * .42)
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
         const titleSize = Math.max(25, Math.round(w * .052))
         const subtitleSize = Math.max(17, Math.round(w * .029))
+        ctx.font = `700 ${titleSize}px 'DM Sans', system-ui, sans-serif`
         const titleLines = wrap(ctx, title, w * .82)
         if (titleLines.length) {
-          ctx.font = `700 ${titleSize}px 'DM Sans', system-ui, sans-serif`
           ctx.fillStyle = '#fffaf3'
           titleLines.forEach((line, index) => ctx.fillText(line, w / 2, h * .80 + index * titleSize * 1.12, w * .86))
         }
@@ -167,7 +169,7 @@ export function CanvasPreview({ clip, localTime, playing, format, title, subtitl
     }
     render()
     return () => cancelAnimationFrame(frame)
-  }, [clip?.id, format, frameReady, height, localTime, playing, title, subtitle, width])
+  }, [clip?.id, clip?.motion, clip?.inPoint, clip?.outPoint, format, frameReady, height, localTime, playing, title, subtitle, width])
 
   return (
     <div className={`canvas-frame canvas-${format}`}>

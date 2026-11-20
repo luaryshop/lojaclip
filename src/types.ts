@@ -1,6 +1,8 @@
 export type MediaKind = 'image' | 'video' | 'audio'
 export type FrameFormat = 'portrait' | 'square' | 'landscape'
 
+export type MotionPreset = 'none' | 'zoom-in' | 'zoom-out' | 'pan-left' | 'pan-right' | 'pan-up' | 'pan-down'
+
 export interface MediaAsset {
   id: string
   file: File
@@ -16,6 +18,7 @@ export interface VideoClip {
   name: string
   url: string
   kind: 'image' | 'video'
+  motion: MotionPreset
   sourceDuration: number
   inPoint: number
   outPoint: number

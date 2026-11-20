@@ -1,4 +1,5 @@
 import type { FrameFormat, OverlayText, VideoClip } from './types'
+import { drawImageWithMotion } from './motion'
 
 const dimensions: Record<FrameFormat, [number, number]> = {
   portrait: [720, 1280],
@@ -36,7 +37,7 @@ function drawText(ctx: CanvasRenderingContext2D, width: number, height: number, 
     } else line = next
   }
   if (line) lines.push(line)
-  lines.slice(0, 3).forEach((part, index) => ctx.fillText(part, width / 2, height * .80 + index * width * .06, width * .86))
+  lines.slice(0, 3).forEach((part, index) => ctx.fillText(part, width / 2, height * .80 + index * Math.max(25, Math.round(width * .052)) * 1.12, width * .86))
   if (text.subtitle) {
     ctx.fillStyle = '#f5dfbf'
     ctx.font = `500 ${Math.max(17, Math.round(width * .029))}px 'DM Sans', system-ui, sans-serif`
@@ -183,7 +184,7 @@ export async function renderAndExport(
         ctx.fillRect(0, 0, width, height)
         if (clip.kind === 'image') {
           const image = source as HTMLImageElement
-          drawCover(ctx, image, image.naturalWidth, image.naturalHeight, width, height)
+          drawImageWithMotion(ctx, image, image.naturalWidth, image.naturalHeight, width, height, clip.motion, elapsed / duration)
         } else {
           const video = source as HTMLVideoElement
           if (video.readyState >= 2 && video.videoWidth) drawCover(ctx, video, video.videoWidth, video.videoHeight, width, height)

@@ -5,11 +5,12 @@ import {
   Sparkles, Trash2, Type, Upload, Volume2, WandSparkles, X,
 } from 'lucide-react'
 import { CanvasPreview } from './CanvasPreview'
+import { MotionPanel } from './MotionPanel'
 import { clipAtTime, clipLength, totalLength } from './types'
-import type { FrameFormat, MediaAsset, MediaKind, VideoClip } from './types'
+import type { FrameFormat, MediaAsset, MediaKind, MotionPreset, VideoClip } from './types'
 import { renderAndExport } from './videoExport'
 
-type Panel = 'media' | 'text' | 'audio'
+type Panel = 'media' | 'text' | 'audio' | 'motion'
 
 const formatOptions: { key: FrameFormat; title: string; subtitle: string }[] = [
   { key: 'portrait', title: 'Retrato', subtitle: '9:16' },
@@ -49,15 +50,17 @@ function probeDuration(url: string, kind: MediaKind) {
 }
 
 function makeClip(asset: MediaAsset): VideoClip {
+  const stillDuration = asset.kind === 'image' ? 5 : asset.duration
   return {
     id: crypto.randomUUID(),
     assetId: asset.id,
     name: asset.name,
     url: asset.url,
     kind: asset.kind as 'image' | 'video',
-    sourceDuration: asset.duration,
+    motion: asset.kind === 'image' ? 'zoom-in' : 'none',
+    sourceDuration: stillDuration,
     inPoint: 0,
-    outPoint: asset.duration,
+    outPoint: stillDuration,
   }
 }
 
@@ -189,6 +192,23 @@ export default function App() {
 
   const updateClip = (id: string, patch: Partial<VideoClip>) => {
     setClips((current) => current.map((clip) => clip.id === id ? { ...clip, ...patch } : clip))
+  }
+
+  const updatePhotoDuration = (id: string, duration: number) => {
+    const safeDuration = Math.max(2, Math.min(10, Math.round(duration * 2) / 2))
+    setClips((current) => current.map((clip) => clip.id === id && clip.kind === 'image'
+      ? { ...clip, sourceDuration: safeDuration, inPoint: 0, outPoint: safeDuration }
+      : clip))
+  }
+
+  const applyMotionToPhotos = (motion: MotionPreset) => {
+    const photoCount = clips.filter((clip) => clip.kind === 'image').length
+    if (!photoCount) {
+      setNotice('Adicione uma foto à sequência para aplicar movimento.')
+      return
+    }
+    setClips((current) => current.map((clip) => clip.kind === 'image' ? { ...clip, motion } : clip))
+    setNotice(`Movimento aplicado a ${photoCount} ${photoCount === 1 ? 'foto' : 'fotos'}.`)
   }
 
   const selectClip = (clip: VideoClip) => {
@@ -344,6 +364,7 @@ export default function App() {
           <div className="rail-stack">
             <button className={`rail-button ${panel === 'media' ? 'active' : ''}`} onClick={() => setPanel('media')} title="Mídia"><Layers3 size={19} /><span>Mídia</span></button>
             <button className={`rail-button ${panel === 'text' ? 'active' : ''}`} onClick={() => setPanel('text')} title="Texto"><Type size={19} /><span>Texto</span></button>
+            <button className={`rail-button ${panel === 'motion' ? 'active' : ''}`} onClick={() => setPanel('motion')} title="Movimento"><WandSparkles size={19} /><span>Movimento</span></button>
             <button className={`rail-button ${panel === 'audio' ? 'active' : ''}`} onClick={() => setPanel('audio')} title="Áudio"><Music2 size={19} /><span>Áudio</span></button>
           </div>
           <div className="rail-bottom"><div className="rail-avatar">VC</div></div>
@@ -353,7 +374,7 @@ export default function App() {
           <div className="panel-heading">
             <div>
               <p className="eyebrow">ESTÚDIO DE CRIAÇÃO</p>
-              <h1>{panel === 'media' ? 'Sua mídia' : panel === 'text' ? 'Textos' : 'Trilha de áudio'}</h1>
+              <h1>{panel === 'media' ? 'Sua mídia' : panel === 'text' ? 'Textos' : panel === 'audio' ? 'Trilha de áudio' : 'Movimento'}</h1>
             </div>
           </div>
 
@@ -413,6 +434,17 @@ export default function App() {
               <p className="audio-note">Use apenas trilhas e gravações que você tem direito de publicar nos seus anúncios.</p>
             </div>
           )}
+          {panel === 'motion' && (
+            <MotionPanel
+              clips={clips}
+              selectedClip={selectedClip}
+              onSelectClip={selectClip}
+              onSetMotion={(id, motion) => updateClip(id, { motion })}
+              onSetDuration={updatePhotoDuration}
+              onApplyToPhotos={applyMotionToPhotos}
+              onOpenMedia={() => setPanel('media')}
+            />
+          )}
         </aside>
 
         <main className="stage-panel">
@@ -460,11 +492,20 @@ export default function App() {
             <section className="inspector-section clip-section">
               <div className="section-heading"><span className="section-icon"><Scissors size={15} /></span><div><b>Ajuste do clipe</b><small>{selectedClip ? selectedClip.name : 'Selecione um clipe na linha do tempo'}</small></div></div>
               {selectedClip ? <>
-                <label className="trim-label"><span>Início</span><b>{formatTime(selectedClip.inPoint)}</b></label>
-                <input className="trim-slider" type="range" min="0" max={Math.max(0.25, selectedClip.outPoint - .25)} step="0.1" value={selectedClip.inPoint} onChange={(event) => updateClip(selectedClip.id, { inPoint: Math.min(Number(event.target.value), selectedClip.outPoint - .25) })} />
-                <label className="trim-label end-trim"><span>Fim</span><b>{formatTime(selectedClip.outPoint)}</b></label>
-                <input className="trim-slider" type="range" min={Math.min(selectedClip.sourceDuration, selectedClip.inPoint + .25)} max={selectedClip.sourceDuration} step="0.1" value={selectedClip.outPoint} onChange={(event) => updateClip(selectedClip.id, { outPoint: Math.max(Number(event.target.value), selectedClip.inPoint + .25) })} />
-                <div className="clip-duration"><Clock3 size={14} /><span>Duração na sequência</span><b>{formatTime(selectedClipDuration)}</b></div>
+                {selectedClip.kind === 'image' ? (
+                  <>
+                    <div className="clip-duration"><Clock3 size={14} /><span>Duração da foto animada</span><b>{formatTime(selectedClipDuration)}</b></div>
+                    <button className="motion-open-link" onClick={() => setPanel('motion')}><WandSparkles size={14} /> Ajustar movimento e duração</button>
+                  </>
+                ) : (
+                  <>
+                    <label className="trim-label"><span>Início</span><b>{formatTime(selectedClip.inPoint)}</b></label>
+                    <input className="trim-slider" type="range" min="0" max={Math.max(0.25, selectedClip.outPoint - .25)} step="0.1" value={selectedClip.inPoint} onChange={(event) => updateClip(selectedClip.id, { inPoint: Math.min(Number(event.target.value), selectedClip.outPoint - .25) })} />
+                    <label className="trim-label end-trim"><span>Fim</span><b>{formatTime(selectedClip.outPoint)}</b></label>
+                    <input className="trim-slider" type="range" min={Math.min(selectedClip.sourceDuration, selectedClip.inPoint + .25)} max={selectedClip.sourceDuration} step="0.1" value={selectedClip.outPoint} onChange={(event) => updateClip(selectedClip.id, { outPoint: Math.max(Number(event.target.value), selectedClip.inPoint + .25) })} />
+                    <div className="clip-duration"><Clock3 size={14} /><span>Duração na sequência</span><b>{formatTime(selectedClipDuration)}</b></div>
+                  </>
+                )}
                 <div className="clip-move">
                   <button onClick={() => moveClip(selectedClip.id, -1)} disabled={selectedIndex <= 0}><ChevronLeft size={14} /> Mover antes</button>
                   <button onClick={() => moveClip(selectedClip.id, 1)} disabled={selectedIndex >= clips.length - 1}>Mover depois <ChevronRight size={14} /></button>
